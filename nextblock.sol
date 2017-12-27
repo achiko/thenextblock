@@ -1,5 +1,38 @@
 pragma solidity ^0.4.19;
 
+/**
+ * @title SafeMath
+ * @dev Math operations with safety checks that throw on error
+ */
+library SafeMath {
+  function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+    if (a == 0) {
+      return 0;
+    }
+    uint256 c = a * b;
+    assert(c / a == b);
+    return c;
+  }
+
+  function div(uint256 a, uint256 b) internal pure returns (uint256) {
+    // assert(b > 0); // Solidity automatically throws when dividing by 0
+    uint256 c = a / b;
+    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+    return c;
+  }
+
+  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+    assert(b <= a);
+    return a - b;
+  }
+
+  function add(uint256 a, uint256 b) internal pure returns (uint256) {
+    uint256 c = a + b;
+    assert(c >= a);
+    return c;
+  }
+}
+
 contract TheNextBlock {
 
     event BetReceived(address sender, uint256 value, uint256 balance);
@@ -14,7 +47,7 @@ contract TheNextBlock {
     //If this is set to false contract will not receive funds
     bool isBetEnabled = true; 
     //How many guesses you will need in a row to win and get money.
-    uint8 public requiredGuessCount = 2;
+    uint8 public requiredGuessCount = 1;
     //How many percent can take owners from every win.
     uint8 public ownerProfitPercent = 10;
     //Next Jackpot starting balance percent
@@ -41,6 +74,7 @@ contract TheNextBlock {
     mapping(address => uint8) public playersGuessCounts;
     //Wining Table stores everything to execute win and give reward everywon who won.
     struct WiningTable {
+        bool isCalled;
         bool executed;
         uint256 balance;
         address[] jackPotWinners;
@@ -125,25 +159,51 @@ contract TheNextBlock {
                 
                 // reset winners count 
                 playersGuessCounts[msg.sender] = 0;
+                
+            
+                //Here contracts needs to make call to itself which will be executed in next block.
+                //Call is made to a function which will execute wining table and send funds.    
+                if(!wTables[block.number].isCalled) {
+                    wTables[block.number].isCalled = true;
+                    LogStr('call execute Function');
+                    //address(this).call(bytes4(sha3("executeWinnigTable(uint256)")), block.number);
+                    executeWinnigTable(block.number);
+                }
             } 
-            //Here contracts needs to make call to itself which will be executed in new block.
-            //Call is made to a function which will execute wining table and send funds.
-             
-
     }
     
     function executeWinnigTable(uint256  blockNumber) public {
+        
+        LogUint(block.number);
+        LogStr("Executing Winning Function .....");
+        
         if(wTables[blockNumber].executed == false) {
-            WiningTable memory tbl = wTables[blockNumber];
-            // for(uint256 i=0; i < tbl.jackPotWinners.lenght; i++ ) {
-                
-            // } 
+            
+            WiningTable memory winningTable = wTables[blockNumber];
+            
+            LogStr("Log Calculations ");
+            
+            uint256 balance = winningTable.balance;
+            uint256 houseProfit = (balance * ownerProfitPercent)/100;
+            LogUint(houseProfit);
+            uint256 nextJackpotBalance = (balance * nextJackpotBalancePercent)/100;
+            LogUint(nextJackpotBalance);
+            uint256 jackPotWinnerAmount = (balance - houseProfit - nextJackpotBalance) / winningTable.jackPotWinners.length;
+            LogUint(jackPotWinnerAmount);
+                    
+            for(uint256 i=0; i < winningTable.jackPotWinners.length; i++ ) {
+                LogUint(jackPotWinnerAmount);
+                PlayersData[winningTable.jackPotWinners[i]].balance += jackPotWinnerAmount;    
+            }
+            
+            blockedBalance -= winningTable.balance;
         }
     }
     
     function getJackpotWinnersByBlockNumber(uint256 blockNumber) public view returns(address[]) {
         return wTables[blockNumber].jackPotWinners;
     }
+    
 
     function getBalance() public view returns(uint256) {
         return this.balance;
