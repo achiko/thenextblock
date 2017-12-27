@@ -8,7 +8,7 @@ to win jackpot and take available balance on contract. If you fail your bet will
 
 * 1. Genessis JSON File: gennesis.json
 
-``` javascript
+``` json
 {
     "config": {
         "chainId": 577,
