@@ -86,7 +86,7 @@
                     <td>Mined Blocks</td>
                     <td>Miner</td>
                     <td>
-                      <select data-toggle="tooltip" data-placement="top" title="Last Blocks" class="form-control" style="width: 80px; margin: 0 auto;" v-model="blockCount" v-on:change="loadMiners(blockCount)">
+                      <select class="form-control" style="width: 80px; margin: 0 auto;" v-model="blockCount" v-on:change="loadMiners(blockCount)" data-toggle="tooltip" data-placement="top" title="Last Blocks">
                         <option v-for="bo in blockCountOptions">{{bo}}</option>
                       </select>
                     </td>
@@ -96,7 +96,7 @@
                   <tr class="text-center" v-for="(miner, index) in sortedMiners">
                     <td>{{index+1}}</td>
                     <td>{{miner.count}}   ({{formatFloat((miner.count * 100)/blockCount)}}%)</td>
-                    <td>{{miner.address}}   <span v-if="miner.name.length" class="badge badge-primary"><strong>{{miner.name}}</strong></span></td>
+                    <td><a target="_blank" v-bind:href="getEtherScanAddressLink(miner.address+'#mine')">{{miner.address}}</a>   <span v-if="miner.name.length" class="badge badge-primary"><strong>{{miner.name}}</strong></span></td>
                     <td><button type="button" class="btn btn-success btn-sm pointer">BET</button></td>
                   </tr>
                 </tbody>
