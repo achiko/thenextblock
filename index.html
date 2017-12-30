@@ -40,7 +40,7 @@
     				<a class="nav-link" target="_blank" href="https://github.com/achiko/thenextblock"><i class="fa fa-github" aria-hidden="true"></i></a>
     			  </li>
     			  <li>
-              <a class="nav-link" target="_blank" v-bind:href="getEtherScanBlockLink(metamask.lastBlockNumber)"><span>Last Updated Block: {{metamask.lastBlockNumber}}</span></a>
+              <a v-if="metamask.lastBlockNumber" class="nav-link" target="_blank" v-bind:href="getEtherScanBlockLink(metamask.lastBlockNumber)"><span>Last Updated Block: <strong>{{metamask.lastBlockNumber}}</strong></span></a>
     			  </li>
     			  <li>
               <select class="form-control" style="width: 80px; margin: 0 auto;" v-model="loadingInterval" v-on:change="animateLoading" data-toggle="tooltip" data-placement="right" title="Miner Refresh Interval In Minutes">
@@ -117,10 +117,10 @@
                     <td>{{miner.blocks.length}}   ({{formatFloat((miner.blocks.length * 100)/blockCount)}}%)</td>
                     <td>
                       <a target="_blank" v-bind:href="getEtherScanAddressLink(miner.address+'#mine')">{{miner.address}}</a>
-                      <span v-if="miner.name.length" class="badge badge-primary"><strong>{{miner.name}}</strong></span>
-                      <span class="badge badge-success"><strong>{{miner.balance}} ETH</strong></span>
+                      <span v-if="miner.name.length" class="badge badge-primary" data-toggle="tooltip" data-placement="top" title="Mining Pool Name"><strong>{{miner.name}}</strong></span>
+                      <span class="badge badge-success" data-toggle="tooltip" data-placement="top" title="Miner Balance"><strong>{{miner.balance}} ETH</strong></span>
                     </td>
-                    <td><button type="button" class="btn btn-success btn-sm pointer">BET</button></td>
+                    <td><button type="button" class="btn btn-success btn-sm pointer" data-toggle="tooltip" data-placement="right" title="Bet On This Miner">BET</button></td>
                   </tr>
                 </tbody>
               </table>
@@ -166,7 +166,7 @@
                 },
                 blockCount: 0,
                 blockCountOptions: [],
-                loadingInterval: 1,
+                loadingInterval: null,
                 loadingIntervalOptions: [],
             },
             computed: {
@@ -248,7 +248,7 @@
                 _this.loadingIntervalOptions = [];
                 for(var i = 1; i <= rep; i++)
                   _this.loadingIntervalOptions.push(i*factor);
-                _this.loadingInterval = _this.loadingIntervalOptions[0];
+                //_this.loadingInterval = _this.loadingIntervalOptions[0];
               },
               formatFloat: function(number) {
                 return parseFloat(Math.round(number * 100) / 100).toFixed(2);
