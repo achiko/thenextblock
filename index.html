@@ -98,32 +98,7 @@
               </table>
     		    </div>
     		    <div style="min-width: 610px;" class="col-md-6">
-    		      <table v-if="metamask.address.length" class="table">
-                <thead>
-                  <tr class="text-center">
-                    <td># Rank</td>
-                    <td>Mined Blocks</td>
-                    <td>Miner</td>
-                    <td>
-                      <select class="form-control" style="width: 80px; margin: 0 auto;" v-model="blockCount" v-on:change="loadMiners()" data-toggle="tooltip" data-placement="top" title="Last Blocks">
-                        <option v-for="bo in blockCountOptions">{{bo}}</option>
-                      </select>
-                    </td>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr class="text-center" v-for="(miner, index) in sortedMiners">
-                    <td>{{index+1}}</td>
-                    <td>{{miner.blocks.length}}   ({{formatFloat((miner.blocks.length * 100)/blockCount)}}%)</td>
-                    <td>
-                      <a target="_blank" v-bind:href="getEtherScanAddressLink(miner.address+'#mine')">{{miner.address}}</a>
-                      <span v-if="miner.name.length" class="badge badge-primary" data-toggle="tooltip" data-placement="top" title="Mining Pool Name"><strong>{{miner.name}}</strong></span>
-                      <span class="badge badge-success" data-toggle="tooltip" data-placement="top" title="Miner Balance"><strong>{{miner.balance}} ETH</strong></span>
-                    </td>
-                    <td><button type="button" class="btn btn-success btn-sm pointer" data-toggle="tooltip" data-placement="right" title="Bet On This Miner">BET</button></td>
-                  </tr>
-                </tbody>
-              </table>
+
     		    </div>
     		  </div>
     		</div>
