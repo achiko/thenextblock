@@ -71,8 +71,12 @@
                 <tbody>
                   <tr class="text-center" v-for="(miner, index) in sortedMiners">
                     <td>{{index+1}}</td>
-                    <td>{{miner.count}}   ({{formatFloat((miner.count * 100)/blockCount)}}%)</td>
-                    <td><a target="_blank" v-bind:href="getEtherScanAddressLink(miner.address+'#mine')">{{miner.address}}</a>   <span v-if="miner.name.length" class="badge badge-primary"><strong>{{miner.name}}</strong></span></td>
+                    <td>{{miner.blocks.length}}   ({{formatFloat((miner.blocks.length * 100)/blockCount)}}%)</td>
+                    <td>
+                      <a target="_blank" v-bind:href="getEtherScanAddressLink(miner.address+'#mine')">{{miner.address}}</a>
+                      <span v-if="miner.name.length" class="badge badge-primary"><strong>{{miner.name}}</strong></span>
+                      <span class="badge badge-success"><strong>{{miner.balance}} ETH</strong></span>
+                    </td>
                     <td><button type="button" class="btn btn-success btn-sm pointer">BET</button></td>
                   </tr>
                 </tbody>
@@ -95,8 +99,12 @@
                 <tbody>
                   <tr class="text-center" v-for="(miner, index) in sortedMiners">
                     <td>{{index+1}}</td>
-                    <td>{{miner.count}}   ({{formatFloat((miner.count * 100)/blockCount)}}%)</td>
-                    <td><a target="_blank" v-bind:href="getEtherScanAddressLink(miner.address+'#mine')">{{miner.address}}</a>   <span v-if="miner.name.length" class="badge badge-primary"><strong>{{miner.name}}</strong></span></td>
+                    <td>{{miner.blocks.length}}   ({{formatFloat((miner.blocks.length * 100)/blockCount)}}%)</td>
+                    <td>
+                      <a target="_blank" v-bind:href="getEtherScanAddressLink(miner.address+'#mine')">{{miner.address}}</a>
+                      <span v-if="miner.name.length" class="badge badge-primary"><strong>{{miner.name}}</strong></span>
+                      <span class="badge badge-success"><strong>{{miner.balance}} ETH</strong></span>
+                    </td>
                     <td><button type="button" class="btn btn-success btn-sm pointer">BET</button></td>
                   </tr>
                 </tbody>
@@ -147,10 +155,10 @@
               sortedMiners: function () {
                 var _this = this;
                 return _this.miners.sort(function(a, b) {
-                  if (a.count < b.count) {
+                  if (a.blocks.length < b.blocks.length) {
                     return 1;
                   }
-                  if (a.count > b.count) {
+                  if (a.blocks.length > b.blocks.length) {
                     return -1;
                   }
                   return 0;
@@ -172,13 +180,17 @@
                 if(!err && block) {
                   var miner = _this.miners.find(function(miner){ return miner.address == block.miner });
                   if(miner) {
-                    miner.count++;
+                    miner.blocks.push(block.number);
                   } else {
-                    _this.miners.push({
+                    var index = _this.miners.push({
                       blocks: [block.number],
                       address: block.miner,
                       name: _this.minerNames[block.miner] || "",
-                      count: 1
+                      balance: 0
+                    }) - 1;
+                    miner = _this.miners[index];
+                    _this.metamask.web3.eth.getBalance(block.miner, function(err, value) {
+                      miner.balance = _this.formatFloat(_this.metamask.web3.fromWei(value, 'ether').toFixed());
                     });
                   }
                 }
@@ -242,7 +254,6 @@
             },
             updated: function(){
               $(function(){
-                console.log("rger");
           		  $('[data-toggle="tooltip"]').tooltip();
           		});
             }
