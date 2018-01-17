@@ -36,3 +36,10 @@ to win jackpot and take available balance on contract. If you fail your bet will
 
 * start mining
 ``` miner.start(1)```
+
+remix miners 
+
+0x94d76e24f818426ae84aa404140e8d5f60e10e7e
+0x8945a1288dc78a6d8952a92c77aee6730b414778
+0x0e9281e9c6a0808672eaba6bd1220e144c9bb07a
+
