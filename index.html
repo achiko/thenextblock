@@ -43,7 +43,7 @@
               <a v-if="metamask.lastBlockNumber" class="nav-link" target="_blank" v-bind:href="getEtherScanBlockLink(metamask.lastBlockNumber)"><span>Last Updated Block: <strong>{{metamask.lastBlockNumber}}</strong></span></a>
     			  </li>
     			  <li>
-              <select class="form-control" style="width: 80px; margin: 0 auto;" v-model="loadingInterval" v-on:change="animateLoading" data-toggle="tooltip" data-placement="right" title="Miner Refresh Interval In Minutes">
+              <select class="form-control" style="width: 80px; margin: 0 auto;" v-model="loadingInterval" v-on:change="animateLoading" data-toggle="tooltip" data-placement="right" title="Miner Refresh Interval In Seconds">
                 <option v-for="io in loadingIntervalOptions">{{io}}</option>
               </select>
     			  </li>
@@ -86,19 +86,29 @@
                 <tbody>
                   <tr class="text-center" v-for="(miner, index) in sortedMiners">
                     <td>{{index+1}}</td>
-                    <td>{{miner.blocks.length}}   ({{formatFloat((miner.blocks.length * 100)/blockCount)}}%)</td>
+                    <td>{{miner.blocks.length}}   ({{formatFloat((miner.blocks.length * 100)/blockCount, 2)}}%)</td>
                     <td>
-                      <a target="_blank" v-bind:href="getEtherScanAddressLink(miner.address+'#mine')">{{miner.address}}</a>
-                      <span v-if="miner.name.length" class="badge badge-primary"><strong>{{miner.name}}</strong></span>
-                      <span class="badge badge-success"><strong>{{miner.balance}} ETH</strong></span>
+                      <a target="_blank" v-bind:href="getEtherScanAddressLink(miner.address+'#mine')" data-toggle="tooltip" data-placement="top" title="Link To Etherscan">{{miner.address}}</a>
+                      <span v-if="miner.name.length" class="badge badge-primary" data-toggle="tooltip" data-placement="top" title="Mining Pool Name"><strong>{{miner.name}}</strong></span>
+                      <span class="badge badge-success" data-toggle="tooltip" data-placement="top" title="Miners Ballance"><strong>{{miner.balance}} ETH</strong></span>
                     </td>
-                    <td><button type="button" class="btn btn-success btn-sm pointer">BET</button></td>
+                    <td><button v-on:click="placeBet(miner.address)" type="button" class="btn btn-success btn-sm pointer" data-toggle="tooltip" data-placement="right" title="Bet On This Miner">BET</button></td>
                   </tr>
                 </tbody>
               </table>
     		    </div>
     		    <div style="min-width: 610px;" class="col-md-6">
-
+              <div class="row">
+                <div class="col-md-4">
+                  Balance: {{player.balance}}
+                </div>
+                <div class="col-md-4">
+                  Guess Count: {{player.guessCount}}
+                </div>
+                <div class="col-md-4">
+                  Jackpot: {{player.pot}}
+                </div>
+              </div>
     		    </div>
     		  </div>
     		</div>
@@ -111,17 +121,22 @@
 		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ" crossorigin="anonymous"></script>
 		<script src="https://cdn.jsdelivr.net/npm/alertifyjs@1.11.0/build/alertify.min.js"></script>
 		<script src="https://cdn.jsdelivr.net/npm/vue@2.5.13/dist/vue.js"></script>
+		<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/ethjs@0.3.0/dist/ethjs.min.js"></script>
 		<script type"text/javascript">
     		/* global web3 */
     		/* global Web3 */
     		/* global Vue */
     		/* global alertify */
     		/* global $ */
+    		/* global Eth */
     		var app;
     		$( document ).ready(function() {
           app = new Vue({
             el: '#app',
             data: {
+                contract: {
+                  addr: "0x6712F7e812499bfae13378eCfA7D27871AD406D2"
+                },
                 metamask: {
                     address: "",
                     balance: 0,
@@ -143,6 +158,11 @@
                 blockCountOptions: [],
                 loadingInterval: null,
                 loadingIntervalOptions: [],
+                player: {
+                  balance: 0,
+                  guessCount: 0,
+                  pot: 0
+                }
             },
             computed: {
               sortedMiners: function () {
@@ -207,7 +227,7 @@
                     _this.metamask.address = accounts[0];
                     _this.metamask.web3.eth.getBalance(_this.metamask.address, function(err, balance) {
                       if(!err)
-                        _this.metamask.balance = _this.metamask.web3.fromWei(balance, 'ether').toFixed();
+                        _this.metamask.balance = _this.formatFloat(_this.metamask.web3.fromWei(balance, 'ether').toFixed());
                     });
                 });
               },
@@ -223,10 +243,23 @@
                 _this.loadingIntervalOptions = [];
                 for(var i = 1; i <= rep; i++)
                   _this.loadingIntervalOptions.push(i*factor);
-                //_this.loadingInterval = _this.loadingIntervalOptions[0];
+                _this.loadingInterval = _this.loadingIntervalOptions[0];
               },
-              formatFloat: function(number) {
-                return parseFloat(Math.round(number * 100) / 100).toFixed(2);
+              loadContractData: function() {
+                var _this = this;
+                _this.contract.cls.getPot().then(function(val){ _this.player.pot = val[0].toString(); });
+                _this.contract.cls.getMyBalance().then(function(val){ _this.player.balance = val[0].toString(); });
+                _this.contract.cls.getMyGuessCount().then(function(val){ _this.player.guessCount = val[0].toString(); });
+                _this.contract.cls.allowedBetAmount().then(function(val){ _this.player.allowedBetAmount = val[0].toString(); });
+              },
+              placeBet: function(miner) {
+                console.log(miner);
+                var _this = this;
+                _this.contract.cls.placeBet(miner, { from: _this.metamask.web3.eth.accounts[0], value: _this.player.allowedBetAmount }).then(console.log);
+              },
+              formatFloat: function(number, factor) {
+                //return parseFloat(Math.round(number * 100) / 100).toFixed(5);
+                return parseFloat(number).toFixed(factor  || 5);
               },
               getEtherScanAddressLink: function(address) {
                 return "https://etherscan.io/address/{{address}}".replace('{{address}}', address);
@@ -236,14 +269,17 @@
               },
               animateLoading: function() {
                 var _this = this;
-                $("#loading-indicator").css('width', '0%').css('opacity', '0.5').animate({ width: "100%", opacity: 1 }, _this.loadingInterval*60*1000, 'linear', _this.animateLoading);
+                $("#loading-indicator").css('width', '0%').css('opacity', '0.5').animate({ width: "100%", opacity: 1 }, _this.loadingInterval*1000, 'linear', _this.animateLoading);
                 _this.loadMiners();
+                _this.loadContractData();
               }
             },
             created: function() {
                 var _this = this;
-                if(!this.metamask.web3)
-                    this.metamask.web3 = new Web3(web3.currentProvider);
+                if(!_this.metamask.web3){
+                    _this.metamask.web3 = new Web3(web3.currentProvider);
+                    _this.metamask.eth = new Eth(web3.currentProvider);
+                }
                 if(!_this.hasWeb3()) {
                     alertify.alert("Metamask Extension is not installed.", function() {
                     	alertify.error('Install Metamask Extension.');
@@ -261,15 +297,381 @@
                     });
                     return;
                 }
+                
+                _this.contract.abi = [{
+              		"constant": true,
+              		"inputs": [],
+              		"name": "getBalance",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint256"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": false,
+              		"inputs": [
+              			{
+              				"name": "_miner",
+              				"type": "address"
+              			}
+              		],
+              		"name": "placeBet",
+              		"outputs": [],
+              		"payable": true,
+              		"stateMutability": "payable",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [],
+              		"name": "isBetEnabled",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "bool"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [],
+              		"name": "getPot",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint256"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": false,
+              		"inputs": [],
+              		"name": "withdrawMyFunds",
+              		"outputs": [],
+              		"payable": false,
+              		"stateMutability": "nonpayable",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [],
+              		"name": "getMyBalance",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint256"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": false,
+              		"inputs": [],
+              		"name": "withdrawOwnersFunds",
+              		"outputs": [],
+              		"payable": false,
+              		"stateMutability": "nonpayable",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [],
+              		"name": "allowedBetAmount",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint256"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [],
+              		"name": "getMyGuessCount",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint8"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [
+              			{
+              				"name": "playerAddr",
+              				"type": "address"
+              			}
+              		],
+              		"name": "getPlayersGuessCount",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint8"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [
+              			{
+              				"name": "playerAddr",
+              				"type": "address"
+              			}
+              		],
+              		"name": "getPlayersWonBlocks",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint256[]"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [],
+              		"name": "requiredGuessCount",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint8"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [],
+              		"name": "jackpotPercent",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint8"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [],
+              		"name": "ownerProfitPercent",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint8"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [
+              			{
+              				"name": "playerAddr",
+              				"type": "address"
+              			}
+              		],
+              		"name": "getPlayersBalance",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint256"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [
+              			{
+              				"name": "playerAddr",
+              				"type": "address"
+              			}
+              		],
+              		"name": "getMyWonBlocks",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint256[]"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"constant": true,
+              		"inputs": [],
+              		"name": "getOwnersBalance",
+              		"outputs": [
+              			{
+              				"name": "",
+              				"type": "uint256"
+              			}
+              		],
+              		"payable": false,
+              		"stateMutability": "view",
+              		"type": "function"
+              	},
+              	{
+              		"inputs": [],
+              		"payable": false,
+              		"stateMutability": "nonpayable",
+              		"type": "constructor"
+              	},
+              	{
+              		"payable": true,
+              		"stateMutability": "payable",
+              		"type": "fallback"
+              	},
+              	{
+              		"anonymous": false,
+              		"inputs": [
+              			{
+              				"indexed": false,
+              				"name": "sender",
+              				"type": "address"
+              			},
+              			{
+              				"indexed": false,
+              				"name": "value",
+              				"type": "uint256"
+              			},
+              			{
+              				"indexed": false,
+              				"name": "betOnMiner",
+              				"type": "address"
+              			},
+              			{
+              				"indexed": false,
+              				"name": "miner",
+              				"type": "address"
+              			},
+              			{
+              				"indexed": false,
+              				"name": "balance",
+              				"type": "uint256"
+              			}
+              		],
+              		"name": "BetReceived",
+              		"type": "event"
+              	},
+              	{
+              		"anonymous": false,
+              		"inputs": [
+              			{
+              				"indexed": false,
+              				"name": "sender",
+              				"type": "address"
+              			},
+              			{
+              				"indexed": false,
+              				"name": "value",
+              				"type": "uint256"
+              			},
+              			{
+              				"indexed": false,
+              				"name": "rest",
+              				"type": "uint256"
+              			}
+              		],
+              		"name": "GivingBackTheRest",
+              		"type": "event"
+              	},
+              	{
+              		"anonymous": false,
+              		"inputs": [
+              			{
+              				"indexed": false,
+              				"name": "winner",
+              				"type": "address"
+              			}
+              		],
+              		"name": "Jackpot",
+              		"type": "event"
+              	},
+              	{
+              		"anonymous": false,
+              		"inputs": [
+              			{
+              				"indexed": false,
+              				"name": "value",
+              				"type": "string"
+              			}
+              		],
+              		"name": "LogStr",
+              		"type": "event"
+              	},
+              	{
+              		"anonymous": false,
+              		"inputs": [
+              			{
+              				"indexed": false,
+              				"name": "value",
+              				"type": "uint256"
+              			}
+              		],
+              		"name": "LogUint",
+              		"type": "event"
+              	},
+              	{
+              		"anonymous": false,
+              		"inputs": [
+              			{
+              				"indexed": false,
+              				"name": "value",
+              				"type": "address"
+              			}
+              		],
+              		"name": "LogAddress",
+              		"type": "event"
+              	}
+              ];
+                
+                _this.contract.cls = _this.metamask.eth.contract(_this.contract.abi).at(_this.contract.addr);
                 _this.loadBlockCountOptions(50, 7);
-                _this.loadIntervalOptions(1, 5);
+                _this.loadIntervalOptions(10, 5);
                 _this.loadAccount();
-                _this.loadMiners();
+                //_this.loadMiners();
+                _this.animateLoading();
             },
-            updated: function(){
-              $(function(){
-          		  $('[data-toggle="tooltip"]').tooltip();
-          		});
+            mounted: function() {
+              /*$(function(){
+                $('[data-toggle="tooltip"]').tooltip();
+              });*/
             }
           });
         });
