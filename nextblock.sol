@@ -35,64 +35,49 @@ library SafeMath {
 
 contract TheNextBlock {
 
-    event BetReceived(address sender, uint256 value, uint256 balance);
+    event BetReceived(address sender, uint256 value, address betOnMiner, address miner, uint256 balance);
     event GivingBackTheRest(address sender, uint256 value, uint256 rest);
-    event BetExecuted(address sender, uint256 bet, uint256 value);
-    event Balance(uint256 value);
+    event Jackpot(address winner);
     event LogStr(string value);
-    event JackPot(address winner);
-    event LogMiner(address miner);
     event LogUint(uint256 value);
+    event LogAddress(address value);
     
+    //Contract owner address
+    struct Owner {
+        uint256 balance;
+        address addr;
+    }
+    
+    
+    Owner owner;
     //If this is set to false contract will not receive funds
-    bool isBetEnabled = true; 
-    //How many guesses you will need in a row to win and get money.
-    uint8 public requiredGuessCount = 1;
-    //How many percent can take owners from every win.
-    uint8 public ownerProfitPercent = 10;
-    //Next Jackpot starting balance percent
-    uint8 public nextJackpotBalancePercent = 20;
-    //Bonus reward for same(jackpot) block beters  
-    uint8 public bonusRewardPercent = 10;
-    //Winners Jackpot percent
-    uint8 public winnersJackpotPercent = 60;
+    bool public isBetEnabled = true;
     //Exacly how much percent of available balance you can bet. Neither less nor more.
     //If you bet more contract will give you back the rest. If less transaction will be reverted.
     uint256 public allowedBetAmount = 10000000000000000; // 0.01 ETH
-    //Map of guesses, here is stored who how many time guessed.
-    //After every wrong guess counter goes to 0.
-    uint256 public blockedBalance = 0;
-    
+    //How many guesses you will need in a row to win and get money.
+    uint8 public requiredGuessCount = 2;
+    //How many percent can take owners from every win.
+    uint8 public ownerProfitPercent = 10;
+    //Winners Jackpot percent
+    uint8 public jackpotPercent = 90;
+    //Here will be accumulated jackpot
+    uint256 pot = 0;
     // Players struct
-    struct PlayerData {
+    struct Player {
         uint256 balance;
-        uint256[] winningBlocks;
+        uint256[] wonBlocks;
     }
     // Players data
-    mapping(address => PlayerData) public PlayersData;
-    
-    mapping(address => uint8) public playersGuessCounts;
-    //Wining Table stores everything to execute win and give reward everywon who won.
-    struct WiningTable {
-        bool isCalled;
-        bool executed;
-        uint256 balance;
-        address[] jackPotWinners;
-        address[] blockBetters;
-    }
-    
-    //Winners Mapping
-    mapping (uint256 => WiningTable) public wTables;
-        
-
-    //Contract owner address
-    address public owner;
+    mapping(address => Player) private playersStorage;
+    // Counter for players guesses
+    mapping(address => uint8) private playersGuessCounts;
     
     modifier onlyOwner() {
-        require(msg.sender == owner);
+        require(msg.sender == owner.addr);
         _;
     }
-    
+
     modifier notLess() {
         require(msg.value >= allowedBetAmount);
         _;
@@ -101,112 +86,117 @@ contract TheNextBlock {
     modifier notMore() {
         if(msg.value > allowedBetAmount) {
             GivingBackTheRest(msg.sender, msg.value, msg.value - allowedBetAmount);
-            msg.sender.transfer(msg.value - allowedBetAmount);
+            msg.sender.transfer( SafeMath.sub(msg.value, allowedBetAmount) );
         }
         _;
     }
-
-    modifier onlyWhenBetIsEnabled() { 
+    
+    modifier onlyWhenBetIsEnabled() {
         require(isBetEnabled);
         _; 
     }
     
-    modifier onlyWhenGuessed(address miner) {
-        if(block.coinbase == miner){
-            _;
-        }else{
-            if(playerExistsInGuesCountMap(msg.sender)) {
-                playersGuessCounts[msg.sender] = 0;
-            }
-        }
+    function safeGetPercent(uint256 amount, uint8 percent) private pure returns(uint256) {
+        // ((amount - amount%100)/100)*percent
+        return SafeMath.mul( SafeMath.div( SafeMath.sub(amount, amount%100), 100), percent);
     }
     
     function TheNextBlock() public {
-        owner = msg.sender;
-        LogStr("Congratulations Contract Created!");
+        owner.addr = msg.sender;
+        LogStr("Congrats! Contract Created!");
     }
 
     //This is left for donations
     function () public payable { }
-    
-    function playerExistsInGuesCountMap(address player) public view returns(bool) {
-        return playersGuessCounts[player] != address(0x0);
-    }
-    
+
     function placeBet(address _miner) 
-        public 
-        payable 
-        onlyWhenBetIsEnabled 
-        notLess 
-        notMore
-        onlyWhenGuessed(_miner) {
-            BetReceived(msg.sender, msg.value, this.balance);
-            LogMiner(block.coinbase);
-            playersGuessCounts[msg.sender] += 1;
-            // if player reached winning count 
-            if(playersGuessCounts[msg.sender] == requiredGuessCount) {
-                LogUint(wTables[block.number].balance);
-                if(wTables[block.number].balance == 0 ) {
-                    LogStr("First Jackpot Winner !!! ");
-                    wTables[block.number].executed = false;
-                    wTables[block.number].balance = this.balance - blockedBalance;
-                    wTables[block.number].jackPotWinners.push(msg.sender);
-                    blockedBalance += this.balance - blockedBalance;
-                } else {
-                    LogStr("First Jackpot Winner !!! ");
-                    wTables[block.number].jackPotWinners.push(msg.sender);
-                }
-                
-                // reset winners count 
-                playersGuessCounts[msg.sender] = 0;
-                
+        public
+        payable
+        onlyWhenBetIsEnabled
+        notLess
+        notMore {
             
-                //Here contracts needs to make call to itself which will be executed in next block.
-                //Call is made to a function which will execute wining table and send funds.    
-                if(!wTables[block.number].isCalled) {
-                    wTables[block.number].isCalled = true;
-                    LogStr('call execute Function');
-                    //address(this).call(bytes4(sha3("executeWinnigTable(uint256)")), block.number);
-                    executeWinnigTable(block.number);
-                }
-            } 
-    }
-    
-    function executeWinnigTable(uint256  blockNumber) public {
-        
-        LogUint(block.number);
-        LogStr("Executing Winning Function .....");
-        
-        if(wTables[blockNumber].executed == false) {
-            
-            WiningTable memory winningTable = wTables[blockNumber];
-            
-            LogStr("Log Calculations ");
-            
-            uint256 balance = winningTable.balance;
-            uint256 houseProfit = (balance * ownerProfitPercent)/100;
-            LogUint(houseProfit);
-            uint256 nextJackpotBalance = (balance * nextJackpotBalancePercent)/100;
-            LogUint(nextJackpotBalance);
-            uint256 jackPotWinnerAmount = (balance - houseProfit - nextJackpotBalance) / winningTable.jackPotWinners.length;
-            LogUint(jackPotWinnerAmount);
+            BetReceived(msg.sender, msg.value, _miner, block.coinbase,  this.balance);
+
+            owner.balance += safeGetPercent(allowedBetAmount, ownerProfitPercent);
+            pot += safeGetPercent(allowedBetAmount, jackpotPercent);
+
+            if(_miner == block.coinbase) {
+                //Increase guess counter
+                playersGuessCounts[msg.sender]++;
+                //Jackpot
+                if(playersGuessCounts[msg.sender] == requiredGuessCount) {
+                    Jackpot(msg.sender);
                     
-            for(uint256 i=0; i < winningTable.jackPotWinners.length; i++ ) {
-                LogUint(jackPotWinnerAmount);
-                PlayersData[winningTable.jackPotWinners[i]].balance += jackPotWinnerAmount;    
+                    //Store players lucky blocks.
+                    playersStorage[msg.sender].wonBlocks.push(block.number);
+
+                    if(pot >= allowedBetAmount) {
+                        //Give money to player
+                        playersStorage[msg.sender].balance += pot;
+                        //Empty everything
+                        pot = 0;
+                        playersGuessCounts[msg.sender] = 0;
+                    } else {
+                        //Decrease by one if player won and contract has nothing to give.
+                        //This is required for game to be fair.
+                        playersGuessCounts[msg.sender]--;
+                    }
+                }
+            } else {
+                //Reset on lose
+                playersGuessCounts[msg.sender] = 0;
             }
             
-            blockedBalance -= winningTable.balance;
+    }
+    //This is duplicated functionality.
+    //After choosing right style half will be deleted.
+    function getPlayersBalance(address playerAddr) public view returns(uint256) {
+        return playersStorage[playerAddr].balance;
+    }
+    
+    function getPlayersGuessCount(address playerAddr) public view returns(uint8) {
+        return playersGuessCounts[playerAddr];
+    }
+    
+    function getPlayersWonBlocks(address playerAddr) public view returns(uint256[]) {
+        return playersStorage[playerAddr].wonBlocks;
+    }
+    
+    function getMyBalance() public view returns(uint256) {
+        return playersStorage[msg.sender].balance;
+    }
+    
+    function getMyGuessCount() public view returns(uint8) {
+        return playersGuessCounts[msg.sender];
+    }
+    
+    function getMyWonBlocks() public view returns(uint256[]) {
+        return playersStorage[msg.sender].wonBlocks;
+    }
+    
+    function withdrawMyFunds() public {
+        uint256 balance = playersStorage[msg.sender].balance;
+        if(balance != 0) {
+            playersStorage[msg.sender].balance = 0;
+            msg.sender.transfer(balance);
         }
     }
     
-    function getJackpotWinnersByBlockNumber(uint256 blockNumber) public view returns(address[]) {
-        return wTables[blockNumber].jackPotWinners;
+    function withdrawOwnersFunds() public onlyOwner {
+        owner.addr.transfer(owner.balance);
+        owner.balance = 0;
     }
     
-
+    function getOwnersBalance() public view returns(uint256) {
+        return owner.balance;
+    }
+    
+    function getPot() public view returns(uint256) {
+        return pot;
+    }
+    
     function getBalance() public view returns(uint256) {
         return this.balance;
     }
-
-} 
+}
