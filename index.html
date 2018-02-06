@@ -263,7 +263,7 @@
               },
               placeBet: function(miner) {
                 var _this = this;
-                _this.contract.cls.placeBet(miner, { from: _this.metamask.web3.eth.accounts[0], value: _this.player.allowedBetAmount }, console.log);
+                _this.contract.cls.placeBet(miner, { from: _this.metamask.web3.eth.accounts[0], value: _this.player.allowedBetAmount, gas: 4000000, gasPrice: 35000000000 }, console.log);
               },
               formatFloat: function(number, factor) {
                 //return parseFloat(Math.round(number * 100) / 100).toFixed(5);
