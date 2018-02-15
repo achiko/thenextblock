@@ -56,13 +56,13 @@ contract TheNextBlock {
     //If you bet more contract will give you back the rest. If less transaction will be reverted.
     uint256 public allowedBetAmount = 10000000000000000; // 0.01 ETH
     //How many guesses you will need in a row to win and get money.
-    uint8 public requiredGuessCount = 2;
+    uint8 public requiredPoints = 2;
     //How many percent can take owners from every win.
     uint8 public ownerProfitPercent = 10;
-    //Winners Jackpot percent
-    uint8 public jackpotPercent = 90;
+    //Winners prize pool percent
+    uint8 public prizePoolPercent = 90;
     //Here will be accumulated jackpot
-    uint256 pot = 0;
+    uint256 prizePool = 0;
     // Players struct
     struct Player {
         uint256 balance;
@@ -71,7 +71,7 @@ contract TheNextBlock {
     // Players data
     mapping(address => Player) private playersStorage;
     // Counter for players guesses
-    mapping(address => uint8) private playersGuessCounts;
+    mapping(address => uint8) private playersPoints;
     
     modifier onlyOwner() {
         require(msg.sender == owner.addr);
@@ -119,33 +119,33 @@ contract TheNextBlock {
             BetReceived(msg.sender, msg.value, _miner, block.coinbase,  this.balance);
 
             owner.balance += safeGetPercent(allowedBetAmount, ownerProfitPercent);
-            pot += safeGetPercent(allowedBetAmount, jackpotPercent);
+            prizePool += safeGetPercent(allowedBetAmount, prizePoolPercent);
 
             if(_miner == block.coinbase) {
                 //Increase guess counter
-                playersGuessCounts[msg.sender]++;
+                playersPoints[msg.sender]++;
                 //Jackpot
-                if(playersGuessCounts[msg.sender] == requiredGuessCount) {
+                if(playersPoints[msg.sender] == requiredPoints) {
                     Jackpot(msg.sender);
                     
                     //Store players lucky blocks.
                     playersStorage[msg.sender].wonBlocks.push(block.number);
 
-                    if(pot >= allowedBetAmount) {
+                    if(prizePool >= allowedBetAmount) {
                         //Give money to player
-                        playersStorage[msg.sender].balance += pot;
+                        playersStorage[msg.sender].balance += prizePool;
                         //Empty everything
-                        pot = 0;
-                        playersGuessCounts[msg.sender] = 0;
+                        prizePool = 0;
+                        playersPoints[msg.sender] = 0;
                     } else {
                         //Decrease by one if player won and contract has nothing to give.
                         //This is required for game to be fair.
-                        playersGuessCounts[msg.sender]--;
+                        playersPoints[msg.sender]--;
                     }
                 }
             } else {
                 //Reset on lose
-                playersGuessCounts[msg.sender] = 0;
+                playersPoints[msg.sender] = 0;
             }
             
     }
@@ -156,7 +156,7 @@ contract TheNextBlock {
     }
     
     function getPlayersGuessCount(address playerAddr) public view returns(uint8) {
-        return playersGuessCounts[playerAddr];
+        return playersPoints[playerAddr];
     }
     
     function getPlayersWonBlocks(address playerAddr) public view returns(uint256[]) {
@@ -168,7 +168,7 @@ contract TheNextBlock {
     }
     
     function getMyGuessCount() public view returns(uint8) {
-        return playersGuessCounts[msg.sender];
+        return playersPoints[msg.sender];
     }
     
     function getMyWonBlocks() public view returns(uint256[]) {
@@ -192,8 +192,8 @@ contract TheNextBlock {
         return owner.balance;
     }
     
-    function getPot() public view returns(uint256) {
-        return pot;
+    function getPrizePool() public view returns(uint256) {
+        return prizePool;
     }
     
     function getBalance() public view returns(uint256) {
