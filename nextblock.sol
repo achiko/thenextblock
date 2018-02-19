@@ -42,7 +42,6 @@ contract TheNextBlock {
     event LogUint(uint256 value);
     event LogAddress(address value);
     
-    //Contract owner address
     struct Owner {
         uint256 balance;
         address addr;
@@ -50,27 +49,19 @@ contract TheNextBlock {
     
     
     Owner owner;
-    //If this is set to false contract will not receive funds
     bool public isBetEnabled = true;
-    //Exacly how much percent of available balance you can bet. Neither less nor more.
-    //If you bet more contract will give you back the rest. If less transaction will be reverted.
     uint256 public allowedBetAmount = 10000000000000000; // 0.01 ETH
-    //How many guesses you will need in a row to win and get money.
-    uint8 public requiredPoints = 2;
-    //How many percent can take owners from every win.
+    uint8 public requiredPoints = 5;
     uint8 public ownerProfitPercent = 10;
-    //Winners prize pool percent
     uint8 public prizePoolPercent = 90;
-    //Here will be accumulated jackpot
     uint256 prizePool = 0;
-    // Players struct
     struct Player {
         uint256 balance;
         uint256[] wonBlocks;
+        uint256 lastBlock;
     }
-    // Players data
+    
     mapping(address => Player) private playersStorage;
-    // Counter for players guesses
     mapping(address => uint8) private playersPoints;
     
     modifier onlyOwner() {
@@ -91,13 +82,19 @@ contract TheNextBlock {
         _;
     }
     
+    modifier onlyOnce() {
+        Player storage player = playersStorage[msg.sender];
+        require(player.lastBlock != block.number);
+        player.lastBlock = block.number;
+        _;
+    }
+    
     modifier onlyWhenBetIsEnabled() {
         require(isBetEnabled);
         _; 
     }
     
     function safeGetPercent(uint256 amount, uint8 percent) private pure returns(uint256) {
-        // ((amount - amount%100)/100)*percent
         return SafeMath.mul( SafeMath.div( SafeMath.sub(amount, amount%100), 100), percent);
     }
     
@@ -106,7 +103,6 @@ contract TheNextBlock {
         LogStr("Congrats! Contract Created!");
     }
 
-    //This is left for donations
     function () public payable { }
 
     function placeBet(address _miner) 
@@ -114,7 +110,8 @@ contract TheNextBlock {
         payable
         onlyWhenBetIsEnabled
         notLess
-        notMore {
+        notMore
+        onlyOnce {
             
             BetReceived(msg.sender, msg.value, _miner, block.coinbase,  this.balance);
 
@@ -122,35 +119,23 @@ contract TheNextBlock {
             prizePool += safeGetPercent(allowedBetAmount, prizePoolPercent);
 
             if(_miner == block.coinbase) {
-                //Increase guess counter
                 playersPoints[msg.sender]++;
-                //Jackpot
                 if(playersPoints[msg.sender] == requiredPoints) {
                     Jackpot(msg.sender);
-                    
-                    //Store players lucky blocks.
                     playersStorage[msg.sender].wonBlocks.push(block.number);
-
                     if(prizePool >= allowedBetAmount) {
-                        //Give money to player
                         playersStorage[msg.sender].balance += prizePool;
-                        //Empty everything
                         prizePool = 0;
                         playersPoints[msg.sender] = 0;
                     } else {
-                        //Decrease by one if player won and contract has nothing to give.
-                        //This is required for game to be fair.
                         playersPoints[msg.sender]--;
                     }
                 }
             } else {
-                //Reset on lose
                 playersPoints[msg.sender] = 0;
             }
-            
     }
-    //This is duplicated functionality.
-    //After choosing right style half will be deleted.
+
     function getPlayersBalance(address playerAddr) public view returns(uint256) {
         return playersStorage[playerAddr].balance;
     }
@@ -198,5 +183,13 @@ contract TheNextBlock {
     
     function getBalance() public view returns(uint256) {
         return this.balance;
+    }
+    
+    function toggleIsBetEnabled() public {
+        isBetEnabled = !isBetEnabled;
+    }
+    
+    function changeOwner(address newOwner) public onlyOwner {
+        owner.addr = newOwner;
     }
 }
